@@ -2,6 +2,8 @@ const userService = require('../services/userService');
 const { messageService, conversationService } = require('../services/chatService');
 const callService = require('../services/callService');
 const authService = require('../services/authService');
+const contactService = require('../services/contactService');
+const { getLastInsertRowId } = require('../config/database');
 
 const onlineUsers = new Map();
 
@@ -20,6 +22,7 @@ function setupSocket(io) {
     console.log(`User ${socket.userId} connected`);
 
     onlineUsers.set(socket.userId, socket.id);
+    socket.join(`user_${socket.userId}`);
     userService.updateUserStatus(socket.userId, 1);
     io.emit('user_online', { userId: socket.userId });
 
@@ -81,6 +84,92 @@ function setupSocket(io) {
         conversationId,
         userId: socket.userId
       });
+    });
+
+    socket.on('add_friend', async (data) => {
+      try {
+        const { targetUserId } = data;
+        const sender = authService.getProfile(socket.userId);
+        
+        contactService.addContact(socket.userId, targetUserId);
+        
+        const targetSocket = onlineUsers.get(targetUserId);
+        if (targetSocket) {
+          io.to(targetSocket).emit('friend_request', {
+            from: sender,
+            contactId: getLastInsertRowId()
+          });
+        }
+        
+        socket.emit('friend_request_sent', { targetUserId });
+      } catch (error) {
+        console.error('Add friend error:', error);
+        socket.emit('error', { message: error.message });
+      }
+    });
+
+    socket.on('accept_friend', async (data) => {
+      try {
+        const { contactId, fromUserId } = data;
+        contactService.updateContactStatus(contactId, socket.userId, 'accepted');
+        
+        const senderSocket = onlineUsers.get(fromUserId);
+        if (senderSocket) {
+          const accepter = authService.getProfile(socket.userId);
+          io.to(senderSocket).emit('friend_accepted', {
+            accepter,
+            contactId
+          });
+        }
+        
+        socket.emit('friend_accept_success', { contactId });
+      } catch (error) {
+        console.error('Accept friend error:', error);
+        socket.emit('error', { message: error.message });
+      }
+    });
+
+    socket.on('decline_friend', async (data) => {
+      try {
+        const { contactId, fromUserId } = data;
+        contactService.removeContact(contactId, socket.userId);
+        
+        const senderSocket = onlineUsers.get(fromUserId);
+        if (senderSocket) {
+          io.to(senderSocket).emit('friend_declined', { contactId });
+        }
+      } catch (error) {
+        console.error('Decline friend error:', error);
+        socket.emit('error', { message: error.message });
+      }
+    });
+
+    socket.on('create_group', async (data) => {
+      try {
+        const { name, participantIds } = data;
+        const conversation = conversationService.createGroupConversation(
+          socket.userId,
+          name,
+          participantIds
+        );
+
+        io.to(`user_${socket.userId}`).emit('group_created', { conversation });
+
+        conversation.participants.forEach(p => {
+          if (p.id !== socket.userId) {
+            const memberSocket = onlineUsers.get(p.id);
+            if (memberSocket) {
+              io.to(memberSocket).emit('group_invite', {
+                conversation,
+                invitedBy: socket.userId
+              });
+            }
+          }
+        });
+      } catch (error) {
+        console.error('Create group error:', error);
+        socket.emit('error', { message: error.message });
+      }
     });
 
     socket.on('call_user', async (data) => {

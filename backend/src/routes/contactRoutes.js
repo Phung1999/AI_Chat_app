@@ -6,6 +6,7 @@ const { authMiddleware } = require('../middleware/authMiddleware');
 router.use(authMiddleware);
 
 router.get('/', contactController.getContacts);
+router.get('/pending', contactController.getPendingContacts);
 router.post('/', contactController.addContact);
 router.put('/:id', contactController.updateContact);
 router.delete('/:id', contactController.removeContact);

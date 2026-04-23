@@ -73,13 +73,78 @@ class ConversationService {
   }
 
   getConversationById(conversationId) {
-    console.log('DEBUG: getConversationById called with', conversationId);
     const conversation = getOne('SELECT * FROM conversations WHERE id = ?', [conversationId]);
-    console.log('DEBUG: conversation result:', conversation);
     if (!conversation) return null;
     const participants = this.getConversationParticipants(conversationId);
-    console.log('DEBUG: participants:', participants);
     return { ...conversation, participants };
+  }
+
+  createGroupConversation(userId, name, participantIds) {
+    runQuery("INSERT INTO conversations (type, name) VALUES ('group', ?)", [name]);
+    const conversationId = getLastInsertRowId();
+
+    runQuery(
+      'INSERT INTO conversation_participants (conversation_id, user_id) VALUES (?, ?)',
+      [conversationId, userId]
+    );
+
+    for (const pid of participantIds) {
+      if (pid !== userId) {
+        runQuery(
+          'INSERT INTO conversation_participants (conversation_id, user_id) VALUES (?, ?)',
+          [conversationId, pid]
+        );
+      }
+    }
+
+    return this.getConversationById(conversationId);
+  }
+
+  addMemberToGroup(conversationId, userId, newMemberId) {
+    const conversation = getOne('SELECT * FROM conversations WHERE id = ?', [conversationId]);
+    if (!conversation || conversation.type !== 'group') {
+      throw new Error('Not a group conversation');
+    }
+
+    const existing = getOne(
+      'SELECT * FROM conversation_participants WHERE conversation_id = ? AND user_id = ?',
+      [conversationId, newMemberId]
+    );
+    if (existing) {
+      throw new Error('User already in group');
+    }
+
+    runQuery(
+      'INSERT INTO conversation_participants (conversation_id, user_id) VALUES (?, ?)',
+      [conversationId, newMemberId]
+    );
+
+    return this.getConversationById(conversationId);
+  }
+
+  removeMemberFromGroup(conversationId, userId, memberId) {
+    const conversation = getOne('SELECT * FROM conversations WHERE id = ?', [conversationId]);
+    if (!conversation || conversation.type !== 'group') {
+      throw new Error('Not a group conversation');
+    }
+
+    runQuery(
+      'DELETE FROM conversation_participants WHERE conversation_id = ? AND user_id = ?',
+      [conversationId, memberId]
+    );
+
+    return this.getConversationById(conversationId);
+  }
+
+  leaveGroup(conversationId, userId) {
+    runQuery(
+      'DELETE FROM conversation_participants WHERE conversation_id = ? AND user_id = ?',
+      [conversationId, userId]
+    );
+  }
+
+  getGroupMembers(conversationId) {
+    return this.getConversationParticipants(conversationId);
   }
 }
 

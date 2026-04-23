@@ -3,13 +3,25 @@ const contactService = require('../services/contactService');
 async function getContacts(req, res) {
   try {
     const contacts = contactService.getContacts(req.userId);
-    const pending = contactService.getPendingContacts(req.userId);
-    res.json({ success: true, data: { contacts, pending } });
+    res.json({ success: true, data: contacts });
   } catch (error) {
     console.error('Get contacts error:', error);
     res.status(500).json({
       success: false,
       error: { code: 'SERVER_ERROR', message: 'Failed to get contacts' }
+    });
+  }
+}
+
+async function getPendingContacts(req, res) {
+  try {
+    const pending = contactService.getPendingContacts(req.userId);
+    res.json({ success: true, data: pending });
+  } catch (error) {
+    console.error('Get pending contacts error:', error);
+    res.status(500).json({
+      success: false,
+      error: { code: 'SERVER_ERROR', message: 'Failed to get pending contacts' }
     });
   }
 }
@@ -73,4 +85,4 @@ async function removeContact(req, res) {
   }
 }
 
-module.exports = { getContacts, addContact, updateContact, removeContact };
+module.exports = { getContacts, getPendingContacts, addContact, updateContact, removeContact };

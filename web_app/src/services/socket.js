@@ -59,6 +59,22 @@ export const socketService = {
     socket?.emit('stop_typing', { conversationId });
   },
 
+  addFriend: (targetUserId) => {
+    socket?.emit('add_friend', { targetUserId });
+  },
+
+  acceptFriend: (contactId, fromUserId) => {
+    socket?.emit('accept_friend', { contactId, fromUserId });
+  },
+
+  declineFriend: (contactId, fromUserId) => {
+    socket?.emit('decline_friend', { contactId, fromUserId });
+  },
+
+  createGroup: (name, participantIds) => {
+    socket?.emit('create_group', { name, participantIds });
+  },
+
   callUser: (calleeId, callType = 'video') => {
     socket?.emit('call_user', { calleeId, callType });
   },

@@ -49,6 +49,7 @@ export const usersAPI = {
 
 export const contactsAPI = {
   getAll: () => api.get('/contacts'),
+  getPending: () => api.get('/contacts/pending'),
   add: (contactId) => api.post('/contacts', { contactId }),
   update: (id, status) => api.put(`/contacts/${id}`, { status }),
   remove: (id) => api.delete(`/contacts/${id}`),
@@ -57,6 +58,7 @@ export const contactsAPI = {
 export const conversationsAPI = {
   getAll: () => api.get('/conversations'),
   getOrCreate: (participantId) => api.post('/conversations', { participantId }),
+  createGroup: (name, participantIds) => api.post('/conversations/group', { name, participantIds }),
   getMessages: (id, params) => api.get(`/conversations/${id}/messages`, { params }),
   markAsRead: (id) => api.post(`/conversations/${id}/read`),
 };

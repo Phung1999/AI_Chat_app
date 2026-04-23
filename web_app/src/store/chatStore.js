@@ -9,6 +9,8 @@ const useChatStore = create((set, get) => ({
   typingUsers: {},
   onlineUsers: [],
   allUsers: [],
+  contacts: [],
+  pendingRequests: [],
   isLoading: false,
   error: null,
 
@@ -22,6 +24,68 @@ const useChatStore = create((set, get) => ({
     } catch (error) {
       set({ error: 'Failed to load conversations', isLoading: false });
     }
+  },
+
+  loadContacts: async () => {
+    try {
+      const response = await contactsAPI.getAll();
+      if (response.data.success) {
+        set({ contacts: response.data.data });
+      }
+    } catch (error) {
+      console.error('Failed to load contacts:', error);
+    }
+  },
+
+  loadPendingRequests: async () => {
+    try {
+      const response = await contactsAPI.getPending();
+      if (response.data.success) {
+        set({ pendingRequests: response.data.data });
+      }
+    } catch (error) {
+      console.error('Failed to load pending requests:', error);
+    }
+  },
+
+  addContact: async (contactId) => {
+    try {
+      await contactsAPI.add(contactId);
+    } catch (error) {
+      console.error('Failed to add contact:', error);
+    }
+  },
+
+  acceptContact: async (contactId) => {
+    try {
+      await contactsAPI.update(contactId, 'accepted');
+      await get().loadContacts();
+      await get().loadConversations();
+    } catch (error) {
+      console.error('Failed to accept contact:', error);
+    }
+  },
+
+  declineContact: async (contactId) => {
+    try {
+      await contactsAPI.remove(contactId);
+    } catch (error) {
+      console.error('Failed to decline contact:', error);
+    }
+  },
+
+  createGroup: async (name, participantIds) => {
+    try {
+      const response = await conversationsAPI.createGroup(name, participantIds);
+      if (response.data.success) {
+        const { conversations } = get();
+        set({ conversations: [response.data.data, ...conversations] });
+        return response.data.data;
+      }
+    } catch (error) {
+      console.error('Failed to create group:', error);
+    }
+    return null;
   },
 
   loadOnlineUsers: async () => {

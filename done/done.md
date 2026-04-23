@@ -5,12 +5,13 @@
 - [x] Database setup (SQLite via sql.js)
 - [x] Auth API (register, login, logout)
 - [x] User API (search, profile, status)
-- [x] Contact API (add, accept, remove)
+- [x] Contact API (add, accept, remove, pending requests)
 - [x] Message API (send, get, read)
 - [x] Socket.io setup (real-time messaging)
 - [x] Video call signaling (WebRTC relay via socket)
 - [x] Conversation API với unread count & last message
 - [x] Mark messages as read khi xem
+- [x] Group chat API (create, add members, remove, leave)
 
 ## Mobile (Flutter)
 - [x] Project setup
@@ -32,6 +33,9 @@
 - [x] Unread badge + bold text
 - [x] Real-time message via Socket.io
 - [x] Fix simple-peer global is not defined (vite.config.js)
+- [x] Friend request system (add, accept, decline)
+- [x] Group chat creation modal
+- [x] Notification badge cho friend requests
 
 ## Dependencies đã cài
 
@@ -55,7 +59,10 @@ socket.io-client, simple-peer, axios, react-router-dom, zustand
 - [x] test_bookmarklet.js
 - [x] test_script.js
 - [x] test_api_messaging.js
+- [x] test-realchat.js
 
-## Test Users
-- usera@test.com / password123
-- userb@test.com / password123
+## Test Users (Password: 123)
+- usera@test.com / 123
+- userb@test.com / 123
+- alice@test.com / 123
+- bob@test.com / 123

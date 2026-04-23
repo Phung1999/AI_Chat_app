@@ -91,4 +91,95 @@ async function markAsRead(req, res) {
   }
 }
 
-module.exports = { getConversations, getOrCreateConversation, getMessages, sendMessage, markAsRead };
+async function createGroup(req, res) {
+  try {
+    const { name, participantIds } = req.body;
+    if (!name || !participantIds || participantIds.length < 2) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'BAD_REQUEST', message: 'Group requires name and at least 2 members' }
+      });
+    }
+    const conversation = conversationService.createGroupConversation(
+      req.userId,
+      name,
+      participantIds
+    );
+    res.status(201).json({ success: true, data: conversation });
+  } catch (error) {
+    console.error('Create group error:', error);
+    res.status(500).json({
+      success: false,
+      error: { code: 'SERVER_ERROR', message: 'Failed to create group' }
+    });
+  }
+}
+
+async function getGroupMembers(req, res) {
+  try {
+    const members = conversationService.getGroupMembers(parseInt(req.params.id));
+    res.json({ success: true, data: members });
+  } catch (error) {
+    console.error('Get group members error:', error);
+    res.status(500).json({
+      success: false,
+      error: { code: 'SERVER_ERROR', message: 'Failed to get members' }
+    });
+  }
+}
+
+async function addMember(req, res) {
+  try {
+    const { userId: newMemberId } = req.body;
+    const conversation = conversationService.addMemberToGroup(
+      parseInt(req.params.id),
+      req.userId,
+      newMemberId
+    );
+    res.json({ success: true, data: conversation });
+  } catch (error) {
+    if (error.message.includes('Not a group') || error.message.includes('already in')) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'BAD_REQUEST', message: error.message }
+      });
+    }
+    console.error('Add member error:', error);
+    res.status(500).json({
+      success: false,
+      error: { code: 'SERVER_ERROR', message: 'Failed to add member' }
+    });
+  }
+}
+
+async function removeMember(req, res) {
+  try {
+    conversationService.removeMemberFromGroup(
+      parseInt(req.params.id),
+      req.userId,
+      parseInt(req.params.userId)
+    );
+    res.json({ success: true, data: { message: 'Member removed' } });
+  } catch (error) {
+    console.error('Remove member error:', error);
+    res.status(500).json({
+      success: false,
+      error: { code: 'SERVER_ERROR', message: 'Failed to remove member' }
+    });
+  }
+}
+
+async function leaveGroup(req, res) {
+  try {
+    conversationService.leaveGroup(parseInt(req.params.id), req.userId);
+    res.json({ success: true, data: { message: 'Left group' } });
+  } catch (error) {
+    console.error('Leave group error:', error);
+    res.status(500).json({
+      success: false,
+      error: { code: 'SERVER_ERROR', message: 'Failed to leave group' }
+    });
+  }
+}
+
+module.exports = { getConversations, getOrCreateConversation, createGroup, getGroupMembers, addMember, removeMember, leaveGroup, getMessages, sendMessage, markAsRead };
