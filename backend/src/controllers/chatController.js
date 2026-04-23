@@ -52,6 +52,32 @@ async function getMessages(req, res) {
   }
 }
 
+async function sendMessage(req, res) {
+  try {
+    const { content, messageType, fileUrl } = req.body;
+    const message = messageService.createMessage(
+      parseInt(req.params.id),
+      req.userId,
+      content,
+      messageType || 'text',
+      fileUrl
+    );
+    res.json({ success: true, data: message });
+  } catch (error) {
+    if (error.message === 'Not a participant of this conversation') {
+      return res.status(403).json({
+        success: false,
+        error: { code: 'FORBIDDEN', message: error.message }
+      });
+    }
+    console.error('Send message error:', error);
+    res.status(500).json({
+      success: false,
+      error: { code: 'SERVER_ERROR', message: 'Failed to send message' }
+    });
+  }
+}
+
 async function markAsRead(req, res) {
   try {
     messageService.markMessagesAsRead(parseInt(req.params.id), req.userId);
@@ -65,4 +91,4 @@ async function markAsRead(req, res) {
   }
 }
 
-module.exports = { getConversations, getOrCreateConversation, getMessages, markAsRead };
+module.exports = { getConversations, getOrCreateConversation, getMessages, sendMessage, markAsRead };

@@ -7,6 +7,8 @@ const { validateSearch } = require('../middleware/validateMiddleware');
 router.use(authMiddleware);
 
 router.get('/search', validateSearch, userController.searchUsers);
+router.get('/online', userController.getOnlineUsers);
+router.get('/all', userController.getAllUsers);
 router.get('/:id', userController.getUserById);
 router.put('/status', userController.updateStatus);
 

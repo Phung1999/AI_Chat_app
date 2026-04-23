@@ -73,9 +73,12 @@ class ConversationService {
   }
 
   getConversationById(conversationId) {
+    console.log('DEBUG: getConversationById called with', conversationId);
     const conversation = getOne('SELECT * FROM conversations WHERE id = ?', [conversationId]);
+    console.log('DEBUG: conversation result:', conversation);
     if (!conversation) return null;
     const participants = this.getConversationParticipants(conversationId);
+    console.log('DEBUG: participants:', participants);
     return { ...conversation, participants };
   }
 }

@@ -61,6 +61,8 @@ export default function ConversationList({ onSelect }) {
             key={conv.id}
             style={styles.item}
             onClick={() => onSelect?.(conv)}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
           >
             <div style={styles.avatarWrapper}>
               <div style={styles.avatar}>{avatarText}</div>
@@ -71,11 +73,11 @@ export default function ConversationList({ onSelect }) {
               <div style={styles.header}>
                 <span style={styles.name}>{displayName}</span>
                 <span style={styles.time}>
-                  {formatTime(conv.last_message_at || conv.created_at)}
+                  {formatTime(conv.lastMessage?.created_at || conv.created_at)}
                 </span>
               </div>
               <div style={styles.preview}>
-                <span style={styles.lastMessage}>{conv.last_message || 'No messages yet'}</span>
+                <span style={styles.lastMessage}>{conv.lastMessage?.content || 'No messages yet'}</span>
                 {conv.unreadCount > 0 && (
                   <span style={styles.badge}>{conv.unreadCount}</span>
                 )}

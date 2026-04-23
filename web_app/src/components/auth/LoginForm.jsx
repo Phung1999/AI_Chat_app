@@ -7,12 +7,18 @@ export default function LoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
   const { login, error, clearError } = useAuthStore();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isSubmitting) return;
+    
+    setIsSubmitting(true);
     const success = await login(email, password);
+    setIsSubmitting(false);
+    
     if (success) {
       navigate('/');
     }
@@ -70,7 +76,9 @@ export default function LoginForm() {
             </button>
           </div>
 
-          <button type="submit" style={styles.button}>Sign In</button>
+          <button type="submit" style={styles.button} disabled={isSubmitting}>
+            {isSubmitting ? 'Signing in...' : 'Sign In'}
+          </button>
         </form>
 
         <p style={styles.footer}>

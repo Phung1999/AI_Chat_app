@@ -43,7 +43,10 @@ function setupSocket(io) {
           fileUrl
         );
 
-        io.to(`conversation_${conversationId}`).emit('new_message', { message });
+        io.to(`conversation_${conversationId}`).emit('new_message', {
+          message,
+          conversationId
+        });
 
         const conversation = conversationService.getConversationById(conversationId);
         conversation?.participants.forEach(p => {

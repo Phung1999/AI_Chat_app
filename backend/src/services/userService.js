@@ -32,6 +32,17 @@ class UserService {
     );
   }
 
+  getAllUsers(excludeUserId) {
+    return getAll(
+      `SELECT id, email, display_name, avatar_url, online_status
+       FROM users
+       WHERE id != ?
+       ORDER BY online_status DESC, display_name ASC
+       LIMIT 50`,
+      [excludeUserId]
+    );
+  }
+
   updateUserStatus(userId, status) {
     runQuery(
       "UPDATE users SET online_status = ?, updated_at = datetime('now') WHERE id = ?",

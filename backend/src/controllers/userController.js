@@ -1,4 +1,5 @@
 const userService = require('../services/userService');
+const conversationService = require('../services/chatService');
 
 async function searchUsers(req, res) {
   try {
@@ -10,6 +11,33 @@ async function searchUsers(req, res) {
     res.status(500).json({
       success: false,
       error: { code: 'SERVER_ERROR', message: 'Search failed' }
+    });
+  }
+}
+
+async function getOnlineUsers(req, res) {
+  try {
+    const users = userService.getAllUsers(req.userId);
+    const onlineUsers = users.filter(u => u.online_status === 1);
+    res.json({ success: true, data: onlineUsers });
+  } catch (error) {
+    console.error('Get online users error:', error);
+    res.status(500).json({
+      success: false,
+      error: { code: 'SERVER_ERROR', message: 'Failed to get online users' }
+    });
+  }
+}
+
+async function getAllUsers(req, res) {
+  try {
+    const users = userService.getAllUsers(req.userId);
+    res.json({ success: true, data: users });
+  } catch (error) {
+    console.error('Get all users error:', error);
+    res.status(500).json({
+      success: false,
+      error: { code: 'SERVER_ERROR', message: 'Failed to get users' }
     });
   }
 }
@@ -47,4 +75,4 @@ async function updateStatus(req, res) {
   }
 }
 
-module.exports = { searchUsers, getUserById, updateStatus };
+module.exports = { searchUsers, getUserById, updateStatus, getOnlineUsers, getAllUsers };

@@ -20,9 +20,12 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem(STORAGE_KEYS.TOKEN);
-      localStorage.removeItem(STORAGE_KEYS.USER_ID);
-      window.location.href = '/login';
+      const isAuthRequest = error.config?.url?.includes('/auth/');
+      if (!isAuthRequest) {
+        localStorage.removeItem(STORAGE_KEYS.TOKEN);
+        localStorage.removeItem(STORAGE_KEYS.USER_ID);
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }
@@ -40,6 +43,8 @@ export const usersAPI = {
   search: (query) => api.get('/users/search', { params: { q: query } }),
   getById: (id) => api.get(`/users/${id}`),
   updateStatus: (status) => api.put('/users/status', { status }),
+  getOnline: () => api.get('/users/online'),
+  getAll: () => api.get('/users/all'),
 };
 
 export const contactsAPI = {

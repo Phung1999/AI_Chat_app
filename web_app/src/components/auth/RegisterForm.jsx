@@ -9,16 +9,26 @@ export default function RegisterForm() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [localError, setLocalError] = useState('');
   const navigate = useNavigate();
   const { register, error, clearError } = useAuthStore();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setLocalError('');
+    clearError();
+    
     if (password !== confirmPassword) {
-      alert('Passwords do not match');
+      setLocalError('Passwords do not match');
       return;
     }
+    if (isSubmitting) return;
+    
+    setIsSubmitting(true);
     const success = await register(email, password, displayName);
+    setIsSubmitting(false);
+    
     if (success) {
       navigate('/');
     }
@@ -28,6 +38,13 @@ export default function RegisterForm() {
     <div style={styles.container}>
       <div style={styles.card}>
         <h1 style={styles.title}>Create Account</h1>
+
+        {localError && (
+          <div style={styles.error}>
+            {localError}
+            <button onClick={() => setLocalError('')} style={styles.errorClose}>×</button>
+          </div>
+        )}
 
         {error && (
           <div style={styles.error}>

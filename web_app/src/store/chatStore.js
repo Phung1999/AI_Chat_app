@@ -7,6 +7,8 @@ const useChatStore = create((set, get) => ({
   currentConversation: null,
   messages: {},
   typingUsers: {},
+  onlineUsers: [],
+  allUsers: [],
   isLoading: false,
   error: null,
 
@@ -22,17 +24,60 @@ const useChatStore = create((set, get) => ({
     }
   },
 
+  loadOnlineUsers: async () => {
+    try {
+      const response = await usersAPI.getOnline();
+      if (response.data.success) {
+        set({ onlineUsers: response.data.data || [] });
+      }
+    } catch (error) {
+      console.error('Failed to load online users:', error);
+      set({ onlineUsers: [] });
+    }
+  },
+
+  addOnlineUser: (userId) => {
+    set((state) => {
+      const exists = state.onlineUsers.some(u => u.id === userId);
+      if (exists) return state;
+      return { onlineUsers: [...state.onlineUsers, { id: userId, isOnline: true }] };
+    });
+  },
+
+  removeOnlineUser: (userId) => {
+    set((state) => ({
+      onlineUsers: state.onlineUsers.filter(u => u.id !== userId),
+    }));
+  },
+
+  loadAllUsers: async () => {
+    try {
+      const response = await usersAPI.getAll();
+      if (response.data.success) {
+        set({ allUsers: response.data.data });
+      }
+    } catch (error) {
+      console.error('Failed to load users:', error);
+    }
+  },
+
+  setOnlineUsers: (users) => set({ onlineUsers: users }),
+
   loadMessages: async (conversationId) => {
     try {
       const response = await conversationsAPI.getMessages(conversationId);
       if (response.data.success) {
+        const messages = response.data.data;
         set((state) => ({
-          messages: { ...state.messages, [conversationId]: response.data.data },
+          messages: { ...state.messages, [conversationId]: messages },
         }));
+        return messages;
       }
     } catch (error) {
+      console.error('Failed to load messages:', error);
       set({ error: 'Failed to load messages' });
     }
+    return [];
   },
 
   setCurrentConversation: (conversation) => {
@@ -44,7 +89,9 @@ const useChatStore = create((set, get) => ({
 
   getOrCreateConversation: async (participantId) => {
     try {
+      console.log('Creating conversation with participant:', participantId);
       const response = await conversationsAPI.getOrCreate(participantId);
+      console.log('API response:', response.data);
       if (response.data.success) {
         const conversation = response.data.data;
         const { conversations } = get();
@@ -59,6 +106,7 @@ const useChatStore = create((set, get) => ({
         return conversation;
       }
     } catch (error) {
+      console.error('Create conversation error:', error);
       set({ error: 'Failed to create conversation' });
     }
     return null;
