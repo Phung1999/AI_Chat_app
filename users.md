@@ -4,18 +4,18 @@
 
 | # | Email | Password | Display Name | Ghi chú |
 |---|-------|----------|--------------|---------|
-| 1 | usera@test.com | password123 | User A | Test user 1 |
-| 2 | userb@test.com | password123 | User B | Test user 2 |
-| 3 | testa@demo.com | password123 | Test User A | API test |
-| 4 | testb@demo.com | password123 | Test User B | API test |
-| 5 | alice@test.com | password123 | Alice | Test user |
-| 6 | bob@test.com | password123 | Bob | Test user |
+| 1 | usera@test.com | 123 | User A | Test user 1 |
+| 2 | userb@test.com | 123 | User B | Test user 2 |
+| 3 | testa@demo.com | 123 | Test User A | API test |
+| 4 | testb@demo.com | 123 | Test User B | API test |
+| 5 | alice@test.com | 123 | Alice | Test user |
+| 6 | bob@test.com | 123 | Bob | Test user |
 
 ## Test Scenarios
 
 ### Test 1: Login
 1. Mở http://localhost:5173
-2. Đăng nhập với `usera@test.com` / `password123`
+2. Đăng nhập với `usera@test.com` / `123`
 
 ### Test 2: Register
 1. Mở http://localhost:5173/register
@@ -35,10 +35,10 @@
 # Register
 curl -X POST http://localhost:3000/api/auth/register \
   -H "Content-Type: application/json" \
-  -d '{"email":"test@demo.com","password":"password123","displayName":"Test"}'
+  -d '{"email":"test@demo.com","password":"123","displayName":"Test"}'
 
 # Login
 curl -X POST http://localhost:3000/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"usera@test.com","password":"password123"}'
+  -d '{"email":"usera@test.com","password":"123"}'
 ```
