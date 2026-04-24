@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { conversationsAPI, usersAPI } from '../services/api';
+import { conversationsAPI, usersAPI, contactsAPI } from '../services/api';
 import { socketService } from '../services/socket';
 
 const useChatStore = create((set, get) => ({

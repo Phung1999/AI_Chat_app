@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import useChatStore from '../../store/chatStore';
 import useAuthStore from '../../store/authStore';
 import { socketService } from '../../services/socket';
-import { COLORS } from '../../services/constants';
+import { useDebounce } from '../../hooks/useDebounce';
+import { contactsAPI } from '../../services/api';
 
-export default function ChatList({ onSelectConversation }) {
+export default function ChatList({ onSelectConversation, isLoading }) {
   const [activeTab, setActiveTab] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
@@ -14,19 +15,32 @@ export default function ChatList({ onSelectConversation }) {
   const [showGroupModal, setShowGroupModal] = useState(false);
   const [selectedMembers, setSelectedMembers] = useState([]);
   const [groupName, setGroupName] = useState('');
+  const debouncedQuery = useDebounce(searchQuery, 400);
   const { user } = useAuthStore();
   const { conversations, loadConversations, searchUsers, contacts, loadContacts } = useChatStore();
+
+  const loadPendingRequests = useCallback(async () => {
+    try {
+      const res = await contactsAPI.getPending();
+      if (res.data?.success) {
+        setFriendRequests(res.data.data);
+      }
+    } catch (err) {
+      console.error('Load pending requests error:', err);
+    }
+  }, []);
 
   useEffect(() => {
     loadConversations();
     loadContacts();
+    loadPendingRequests();
 
     socketService.on('friend_request', (data) => {
       setFriendRequests((prev) => [...prev, data]);
       setShowRequests(true);
     });
 
-    socketService.on('friend_accepted', (data) => {
+    socketService.on('friend_accepted', () => {
       loadContacts();
       loadConversations();
     });
@@ -35,29 +49,37 @@ export default function ChatList({ onSelectConversation }) {
       socketService.off('friend_request');
       socketService.off('friend_accepted');
     };
-  }, [loadConversations, loadContacts]);
+  }, [loadConversations, loadContacts, loadPendingRequests]);
 
-  const handleSearch = async () => {
-    if (!searchQuery.trim()) return;
-    setIsSearching(true);
-    const results = await searchUsers(searchQuery);
-    setSearchResults(results.filter((u) => u.id !== user?.id));
-    setIsSearching(false);
-  };
+  useEffect(() => {
+    const doSearch = async () => {
+      if (!debouncedQuery.trim()) {
+        setSearchResults([]);
+        return;
+      }
+      setIsSearching(true);
+      const results = await searchUsers(debouncedQuery);
+      setSearchResults(results.filter((u) => u.id !== user?.id));
+      setIsSearching(false);
+    };
+    doSearch();
+  }, [debouncedQuery, searchUsers, user?.id]);
 
-  const handleAddFriend = (u) => {
-    socketService.addFriend(u.id);
-    setSearchResults((prev) => prev.filter((r) => r.id !== u.id));
-  };
-
-  const handleAcceptFriend = (request) => {
-    socketService.acceptFriend(request.contactId, request.from.id);
-    setFriendRequests((prev) => prev.filter((r) => r.contactId !== request.contactId));
-  };
-
-  const handleDeclineFriend = (request) => {
-    socketService.declineFriend(request.contactId, request.from.id);
-    setFriendRequests((prev) => prev.filter((r) => r.contactId !== request.contactId));
+  const handleAddFriend = async (u) => {
+    try {
+      console.log('Adding friend, target email:', u.email);
+      const res = await contactsAPI.add(u.email);
+      console.log('Add friend response:', res.data);
+      if (res.data?.success) {
+        socketService.addFriend(u.email);
+      } else {
+        console.error('Add friend failed:', res.data?.error?.message);
+      }
+    } catch (err) {
+      console.error('Add friend error:', err.response?.data || err);
+    } finally {
+      setSearchResults((prev) => prev.filter((r) => r.id !== u.id));
+    }
   };
 
   const handleCreateGroup = async () => {
@@ -114,134 +136,140 @@ export default function ChatList({ onSelectConversation }) {
   };
 
   return (
-    <div style={styles.container}>
-      <div style={styles.header}>
-        <h2 style={styles.title}>Messages</h2>
-        <div style={styles.headerActions}>
+    <div className="chatlist-container">
+      <div className="chatlist-header">
+        <h2 className="chatlist-title">Messages</h2>
+        <div className="chatlist-header-actions">
           <button
-            style={styles.addFriendMainBtn}
+            className="chatlist-action-btn"
             onClick={() => setShowGroupModal(true)}
-            title="Create group"
+            title="Tạo nhóm"
           >
             <span className="material-symbols-rounded">group_add</span>
           </button>
           <button
-            style={styles.addFriendMainBtn}
+            className="chatlist-action-btn chatlist-request-btn"
             onClick={() => setShowRequests(true)}
-            title="Add new friend"
+            title="Thêm bạn"
           >
             <span className="material-symbols-rounded">person_add</span>
           </button>
-          {friendRequests.length > 0 && (
-            <button
-              style={styles.requestBtn}
-              onClick={() => setShowRequests(true)}
-            >
-              <span className="material-symbols-rounded">notifications</span>
-              <span style={styles.badge}>{friendRequests.length}</span>
-            </button>
-          )}
         </div>
       </div>
 
-      <div style={styles.searchContainer}>
-        <span className="material-symbols-rounded" style={styles.searchIcon}>search</span>
+      <div className="chatlist-search">
+        <span className="material-symbols-rounded chatlist-search-icon">search</span>
         <input
           type="text"
-          placeholder="Search or start new chat"
+          placeholder="Tìm kiếm..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-          style={styles.searchInput}
+          className="chatlist-search-input"
         />
-        <button onClick={handleSearch} style={styles.searchBtn}>
-          <span className="material-symbols-rounded">search</span>
-        </button>
       </div>
 
-      <div style={styles.tabs}>
+      <div className="chatlist-tabs">
         <button
-          style={{ ...styles.tab, ...(activeTab === 'all' ? styles.tabActive : {}) }}
+          className={`chatlist-tab ${activeTab === 'all' ? 'chatlist-tab--active' : ''}`}
           onClick={() => setActiveTab('all')}
         >
-          All
+          Tất cả
         </button>
         <button
-          style={{ ...styles.tab, ...(activeTab === 'unread' ? styles.tabActive : {}) }}
+          className={`chatlist-tab ${activeTab === 'unread' ? 'chatlist-tab--active' : ''}`}
           onClick={() => setActiveTab('unread')}
         >
-          Unread
+          Chưa đọc
         </button>
       </div>
 
-      <div style={styles.list}>
-        {searchResults.length > 0 ? (
+      <div className="chatlist-list">
+        {isLoading ? (
+          <>
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="skeleton-chatlist-item">
+                <div className="skeleton-chatlist-avatar" />
+                <div className="skeleton-chatlist-content">
+                  <div className="skeleton-chatlist-name" />
+                  <div className="skeleton-chatlist-msg" />
+                </div>
+              </div>
+            ))}
+          </>
+        ) : searchResults.length > 0 ? (
           searchResults.map((u) => (
             <div
               key={u.id}
-              style={styles.userItem}
+              className="chatlist-item"
               onClick={() => handleSelectUser(u)}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
             >
-              <div style={styles.avatar}>
-                {(u.display_name || u.email || 'U')[0].toUpperCase()}
+              <div className="chatlist-item-avatar-wrap">
+                <div className="chatlist-item-avatar">
+                  {(u.display_name || u.email || 'U')[0].toUpperCase()}
+                </div>
               </div>
-              <div style={styles.userInfo}>
-                <div style={styles.userName}>{u.display_name || u.email}</div>
-                <div style={styles.userEmail}>{u.email}</div>
+              <div className="chatlist-item-content">
+                <div className="chatlist-item-row">
+                  <span className="chatlist-item-name">{u.display_name || u.email}</span>
+                </div>
+                <div className="chatlist-item-row">
+                  <span className="chatlist-item-preview">{u.email}</span>
+                </div>
               </div>
               <button
-                style={styles.addFriendBtn}
+                className="modal-item-btn"
                 onClick={(e) => { e.stopPropagation(); handleAddFriend(u); }}
-                title="Add friend"
+                title="Kết bạn"
               >
                 <span className="material-symbols-rounded">person_add</span>
               </button>
             </div>
           ))
         ) : filteredConversations.length === 0 ? (
-          <div style={styles.empty}>
-            <span className="material-symbols-rounded" style={styles.emptyIcon}>chat</span>
-            <p>No conversations yet</p>
-            <p style={styles.emptyHint}>Search for users to add friends</p>
+          <div className="chatlist-empty">
+            <span className="material-symbols-rounded chatlist-empty-icon">chat</span>
+            <p>Chưa có cuộc trò chuyện nào</p>
+            <p className="chatlist-empty-hint">Tìm kiếm người dùng để kết bạn</p>
           </div>
         ) : (
           filteredConversations.map((conv) => {
             const otherUser = getOtherParticipant(conv);
-            const displayName = otherUser?.display_name || otherUser?.email || 'Unknown';
-            const isOnline = otherUser?.online_status === 1;
+            const displayName = conv.type === 'group'
+              ? conv.name
+              : (otherUser?.display_name || otherUser?.email || 'Unknown');
+            const isOnline = conv.type !== 'group' && otherUser?.online_status === 1;
             const isUnread = conv.unreadCount > 0;
-            const lastMsg = conv.lastMessage?.content || 'No messages yet';
+            const lastMsg = conv.lastMessage?.content || 'Chưa có tin nhắn';
 
             return (
               <div
                 key={conv.id}
-                style={styles.item}
+                className="chatlist-item"
                 onClick={() => onSelectConversation?.(conv)}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
               >
-                <div style={styles.avatarWrapper}>
-                  <div style={styles.avatar}>
+                <div className="chatlist-item-avatar-wrap">
+                  <div className={`chatlist-item-avatar ${conv.type === 'group' ? 'chatlist-item-avatar--group' : ''}`}>
                     {displayName[0].toUpperCase()}
                   </div>
-                  {isOnline && <div style={styles.onlineDot} />}
+                  {isOnline && <div className="chatlist-online-dot" />}
                 </div>
-                <div style={styles.content}>
-                  <div style={styles.row}>
-                    <span style={{ ...styles.name, ...(isUnread ? styles.nameBold : {}) }}>
+                <div className="chatlist-item-content">
+                  <div className="chatlist-item-row">
+                    <span className={`chatlist-item-name ${isUnread ? 'chatlist-item-name--unread' : ''}`}>
                       {displayName}
                     </span>
-                    <span style={styles.time}>
+                    <span className="chatlist-item-time">
                       {formatTime(conv.lastMessage?.created_at)}
                     </span>
                   </div>
-                  <div style={styles.row}>
-                    <span style={{ ...styles.lastMessage, ...(isUnread ? styles.lastMessageBold : {}) }}>
+                  <div className="chatlist-item-row">
+                    <span className={`chatlist-item-preview ${isUnread ? 'chatlist-item-preview--unread' : ''}`}>
+                      {conv.type === 'group' && conv.lastMessage?.sender
+                        ? `${conv.lastMessage.sender.display_name || conv.lastMessage.sender.email}: `
+                        : ''}
                       {lastMsg}
                     </span>
-                    {isUnread && <span style={styles.badge}>{conv.unreadCount}</span>}
+                    {isUnread && <span className="chatlist-item-badge">{conv.unreadCount}</span>}
                   </div>
                 </div>
               </div>
@@ -250,48 +278,49 @@ export default function ChatList({ onSelectConversation }) {
         )}
       </div>
 
+      {/* ADD FRIENDS MODAL */}
       {showRequests && (
-        <div style={styles.modalOverlay} onClick={() => setShowRequests(false)}>
-          <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-            <div style={styles.addFriendHeader}>
-              <span style={styles.addFriendTitle}>Add Friends</span>
-              <button onClick={() => setShowRequests(false)} style={styles.closeRequests}>
+        <div className="modal-overlay" onClick={() => setShowRequests(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <span className="modal-title">Thêm bạn bè</span>
+              <button className="modal-close" onClick={() => setShowRequests(false)}>
                 <span className="material-symbols-rounded">close</span>
               </button>
             </div>
-            <div style={styles.addFriendSearch}>
+            <div className="modal-search">
               <input
                 type="text"
-                placeholder="Search by email or name..."
+                placeholder="Tìm theo email hoặc tên..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                style={styles.addFriendSearchInput}
+                className="modal-search-input"
                 autoFocus
               />
             </div>
-            <div style={styles.addFriendList}>
+            <div className="modal-list">
               {isSearching ? (
-                <div style={styles.empty}>Searching...</div>
+                <div className="chatlist-empty">Đang tìm kiếm...</div>
               ) : searchResults.length === 0 ? (
-                <div style={styles.empty}>No users found</div>
+                <div className="chatlist-empty">Không tìm thấy người dùng</div>
               ) : (
                 searchResults.map((u) => (
                   <div
                     key={u.id}
-                    style={styles.requestItem}
+                    className="modal-item"
                   >
-                    <div style={styles.requestAvatar}>
+                    <div className="modal-item-avatar">
                       {(u.display_name || u.email || 'U')[0].toUpperCase()}
                     </div>
-                    <div style={styles.requestInfo}>
-                      <div style={styles.requestName}>{u.display_name || u.email}</div>
-                      <div style={styles.requestEmail}>{u.email}</div>
+                    <div className="modal-item-info">
+                      <div className="modal-item-name">{u.display_name || u.email}</div>
+                      <div className="modal-item-email">{u.email}</div>
                     </div>
                     <button
-                      style={styles.acceptBtn}
+                      className="modal-item-btn"
                       onClick={() => handleAddFriend(u)}
-                      title="Send friend request"
+                      title="Gửi lời kết bạn"
                     >
                       <span className="material-symbols-rounded">person_add</span>
                     </button>
@@ -303,67 +332,62 @@ export default function ChatList({ onSelectConversation }) {
         </div>
       )}
 
+      {/* CREATE GROUP MODAL */}
       {showGroupModal && (
-        <div style={styles.modalOverlay} onClick={() => setShowGroupModal(false)}>
-          <div style={styles.groupModalContent} onClick={(e) => e.stopPropagation()}>
-            <div style={styles.addFriendHeader}>
-              <span style={styles.addFriendTitle}>Create Group</span>
-              <button onClick={() => setShowGroupModal(false)} style={styles.closeRequests}>
+        <div className="modal-overlay" onClick={() => setShowGroupModal(false)}>
+          <div className="modal-content modal-content--group" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <span className="modal-title">Tạo nhóm chat</span>
+              <button className="modal-close" onClick={() => setShowGroupModal(false)}>
                 <span className="material-symbols-rounded">close</span>
               </button>
             </div>
-            <div style={styles.addFriendSearch}>
+            <div className="modal-search">
               <input
                 type="text"
-                placeholder="Group name..."
+                placeholder="Tên nhóm..."
                 value={groupName}
                 onChange={(e) => setGroupName(e.target.value)}
-                style={styles.addFriendSearchInput}
+                className="modal-search-input"
               />
             </div>
-            <div style={styles.groupMembersHeader}>
-              <span>Select members (at least 2)</span>
-              <span style={styles.memberCount}>{selectedMembers.length} selected</span>
+            <div className="modal-group-members-header">
+              <span>Chọn thành viên (ít nhất 2)</span>
+              <span className="modal-member-count">{selectedMembers.length} đã chọn</span>
             </div>
-            <div style={styles.addFriendList}>
+            <div className="modal-list">
               {contacts.length === 0 ? (
-                <div style={styles.empty}>No friends yet. Add friends first!</div>
+                <div className="chatlist-empty">Chưa có bạn bè. Kết bạn trước!</div>
               ) : (
                 contacts.map((u) => (
                   <div
                     key={u.id}
-                    style={{
-                      ...styles.requestItem,
-                      ...(selectedMembers.includes(u.id) ? styles.selectedMember : {}),
-                    }}
+                    className={`modal-item ${selectedMembers.includes(u.id) ? 'modal-item--selected' : ''}`}
                     onClick={() => toggleMemberSelection(u.id)}
                   >
-                    <div style={styles.requestAvatar}>
+                    <div className="modal-item-avatar">
                       {(u.display_name || u.email || 'U')[0].toUpperCase()}
                     </div>
-                    <div style={styles.requestInfo}>
-                      <div style={styles.requestName}>{u.display_name || u.email}</div>
-                      <div style={styles.requestEmail}>{u.email}</div>
+                    <div className="modal-item-info">
+                      <div className="modal-item-name">{u.display_name || u.email}</div>
+                      <div className="modal-item-email">{u.email}</div>
                     </div>
-                    <div style={styles.checkbox}>
+                    <div className={`modal-item-checkbox ${selectedMembers.includes(u.id) ? 'modal-item-checkbox--checked' : ''}`}>
                       {selectedMembers.includes(u.id) && (
-                        <span className="material-symbols-rounded" style={styles.checkIcon}>check</span>
+                        <span className="material-symbols-rounded modal-check-icon">check</span>
                       )}
                     </div>
                   </div>
                 ))
               )}
             </div>
-            <div style={styles.groupFooter}>
+            <div className="modal-footer">
               <button
-                style={{
-                  ...styles.createGroupBtn,
-                  ...(selectedMembers.length < 2 || !groupName.trim() ? styles.createGroupBtnDisabled : {}),
-                }}
+                className="btn-primary"
                 onClick={handleCreateGroup}
                 disabled={selectedMembers.length < 2 || !groupName.trim()}
               >
-                Create Group
+                Tạo nhóm
               </button>
             </div>
           </div>
@@ -372,462 +396,3 @@ export default function ChatList({ onSelectConversation }) {
     </div>
   );
 }
-
-const styles = {
-  container: {
-    width: 280,
-    height: '100vh',
-    backgroundColor: 'white',
-    borderRight: '1px solid #e0e0e0',
-    display: 'flex',
-    flexDirection: 'column',
-    position: 'relative',
-  },
-  header: {
-    padding: '16px 16px 8px',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  title: {
-    margin: 0,
-    fontSize: 24,
-    fontWeight: 700,
-    color: COLORS.text,
-  },
-  headerActions: {
-    display: 'flex',
-    gap: 8,
-  },
-  addFriendMainBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: '50%',
-    backgroundColor: COLORS.primary,
-    border: 'none',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    color: 'white',
-  },
-  requestBtn: {
-    position: 'relative',
-    width: 36,
-    height: 36,
-    borderRadius: '50%',
-    backgroundColor: '#f0f2f5',
-    border: 'none',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    color: COLORS.primary,
-  },
-  badge: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-    backgroundColor: COLORS.accent,
-    color: 'white',
-    fontSize: 10,
-    fontWeight: 600,
-    padding: '2px 5px',
-    borderRadius: 10,
-    minWidth: 16,
-    textAlign: 'center',
-  },
-  searchContainer: {
-    padding: '0 12px 12px',
-    position: 'relative',
-  },
-  searchIcon: {
-    position: 'absolute',
-    left: 24,
-    top: '50%',
-    transform: 'translateY(-50%)',
-    color: '#999',
-    fontSize: 20,
-  },
-  searchInput: {
-    width: '100%',
-    padding: '10px 12px 10px 40px',
-    border: 'none',
-    borderRadius: 20,
-    backgroundColor: '#f0f2f5',
-    fontSize: 14,
-    outline: 'none',
-  },
-  searchBtn: {
-    position: 'absolute',
-    right: 16,
-    top: '50%',
-    transform: 'translateY(-50%)',
-    background: 'none',
-    border: 'none',
-    cursor: 'pointer',
-    color: COLORS.primary,
-  },
-  tabs: {
-    display: 'flex',
-    padding: '0 12px 12px',
-    gap: 8,
-  },
-  tab: {
-    flex: 1,
-    padding: '8px 16px',
-    border: 'none',
-    borderRadius: 20,
-    backgroundColor: 'transparent',
-    color: '#666',
-    fontSize: 14,
-    fontWeight: 500,
-    cursor: 'pointer',
-  },
-  tabActive: {
-    backgroundColor: COLORS.primary,
-    color: 'white',
-  },
-  list: {
-    flex: 1,
-    overflow: 'auto',
-  },
-  empty: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: '100%',
-    color: '#999',
-  },
-  emptyIcon: {
-    fontSize: 48,
-    marginBottom: 8,
-  },
-  emptyHint: {
-    fontSize: 13,
-    marginTop: 4,
-  },
-  item: {
-    display: 'flex',
-    alignItems: 'center',
-    padding: '12px 16px',
-    cursor: 'pointer',
-    transition: 'background-color 0.15s',
-  },
-  userItem: {
-    display: 'flex',
-    alignItems: 'center',
-    padding: '12px 16px',
-    cursor: 'pointer',
-    transition: 'background-color 0.15s',
-  },
-  avatarWrapper: {
-    position: 'relative',
-    marginRight: 12,
-  },
-  avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: '50%',
-    backgroundColor: COLORS.primary,
-    color: 'white',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: 18,
-    fontWeight: 600,
-  },
-  onlineDot: {
-    position: 'absolute',
-    bottom: 2,
-    right: 2,
-    width: 12,
-    height: 12,
-    borderRadius: '50%',
-    backgroundColor: COLORS.online,
-    border: '2px solid white',
-  },
-  content: {
-    flex: 1,
-    minWidth: 0,
-  },
-  row: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  name: {
-    fontSize: 15,
-    fontWeight: 500,
-    color: COLORS.text,
-  },
-  nameBold: {
-    fontWeight: 700,
-  },
-  time: {
-    fontSize: 12,
-    color: COLORS.time,
-  },
-  lastMessage: {
-    fontSize: 14,
-    color: '#888',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-    maxWidth: 160,
-    marginTop: 2,
-  },
-  lastMessageBold: {
-    color: COLORS.text,
-    fontWeight: 500,
-  },
-  badge: {
-    backgroundColor: COLORS.accent,
-    color: 'white',
-    fontSize: 11,
-    fontWeight: 600,
-    padding: '2px 6px',
-    borderRadius: 10,
-    minWidth: 18,
-    textAlign: 'center',
-  },
-  userInfo: {
-    flex: 1,
-  },
-  userName: {
-    fontSize: 15,
-    fontWeight: 500,
-    color: COLORS.text,
-  },
-  userEmail: {
-    fontSize: 13,
-    color: '#888',
-  },
-  addFriendBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: '50%',
-    backgroundColor: COLORS.primary,
-    border: 'none',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    color: 'white',
-  },
-  requestsPanel: {
-    position: 'absolute',
-    top: 0,
-    left: '100%',
-    width: 280,
-    height: '100vh',
-    backgroundColor: 'white',
-    borderRight: '1px solid #e0e0e0',
-    boxShadow: '2px 0 8px rgba(0,0,0,0.1)',
-    zIndex: 100,
-    display: 'flex',
-    flexDirection: 'column',
-  },
-  addFriendModal: {
-    position: 'absolute',
-    top: 0,
-    left: '100%',
-    width: 280,
-    height: '100vh',
-    backgroundColor: 'white',
-    borderRight: '1px solid #e0e0e0',
-    boxShadow: '2px 0 8px rgba(0,0,0,0.1)',
-    zIndex: 101,
-    display: 'flex',
-    flexDirection: 'column',
-  },
-  addFriendHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '16px',
-    borderBottom: '1px solid #e0e0e0',
-  },
-  addFriendTitle: {
-    fontSize: 16,
-    fontWeight: 600,
-    color: COLORS.text,
-    margin: 0,
-  },
-  addFriendSearch: {
-    padding: '12px',
-    borderBottom: '1px solid #f0f0f0',
-  },
-  addFriendSearchInput: {
-    width: '100%',
-    padding: '10px 12px',
-    border: 'none',
-    borderRadius: 20,
-    backgroundColor: '#f0f2f5',
-    fontSize: 14,
-    outline: 'none',
-  },
-  addFriendList: {
-    flex: 1,
-    overflow: 'auto',
-  },
-  requestsHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '16px',
-    borderBottom: '1px solid #e0e0e0',
-    fontWeight: 600,
-  },
-  closeRequests: {
-    background: 'none',
-    border: 'none',
-    cursor: 'pointer',
-    color: '#666',
-  },
-  requestItem: {
-    display: 'flex',
-    alignItems: 'center',
-    padding: '12px 16px',
-    borderBottom: '1px solid #f0f0f0',
-  },
-  requestAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: '50%',
-    backgroundColor: COLORS.secondary,
-    color: 'white',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: 16,
-    fontWeight: 600,
-    marginRight: 12,
-  },
-  requestInfo: {
-    flex: 1,
-  },
-  requestName: {
-    fontSize: 14,
-    fontWeight: 500,
-    color: COLORS.text,
-  },
-  requestEmail: {
-    fontSize: 12,
-    color: '#888',
-  },
-  requestActions: {
-    display: 'flex',
-    gap: 8,
-  },
-  acceptBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: '50%',
-    backgroundColor: COLORS.accent,
-    border: 'none',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    color: 'white',
-  },
-  declineBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: '50%',
-    backgroundColor: '#f0f0f0',
-    border: 'none',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    color: '#666',
-  },
-  modalOverlay: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    display: 'flex',
-    alignItems: 'flex-start',
-    justifyContent: 'flex-start',
-    zIndex: 1000,
-  },
-  modalContent: {
-    width: 320,
-    maxHeight: 500,
-    backgroundColor: 'white',
-    borderRadius: 16,
-    overflow: 'hidden',
-    boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
-    marginTop: 60,
-    marginLeft: 64,
-  },
-  groupModalContent: {
-    width: 340,
-    maxHeight: 550,
-    backgroundColor: 'white',
-    borderRadius: 16,
-    overflow: 'hidden',
-    boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
-    marginTop: 60,
-    marginLeft: 64,
-    display: 'flex',
-    flexDirection: 'column',
-  },
-  groupMembersHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '12px 16px',
-    borderBottom: '1px solid #f0f0f0',
-    fontSize: 13,
-    color: '#666',
-  },
-  memberCount: {
-    backgroundColor: COLORS.primary,
-    color: 'white',
-    padding: '2px 8px',
-    borderRadius: 10,
-    fontSize: 12,
-  },
-  selectedMember: {
-    backgroundColor: '#e8f5e9',
-  },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: '50%',
-    border: '2px solid #ddd',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkIcon: {
-    color: COLORS.accent,
-    fontSize: 16,
-  },
-  groupFooter: {
-    padding: 16,
-    borderTop: '1px solid #e0e0e0',
-  },
-  createGroupBtn: {
-    width: '100%',
-    padding: '12px',
-    backgroundColor: COLORS.primary,
-    color: 'white',
-    border: 'none',
-    borderRadius: 8,
-    fontSize: 15,
-    fontWeight: 600,
-    cursor: 'pointer',
-  },
-  createGroupBtnDisabled: {
-    backgroundColor: '#ccc',
-    cursor: 'not-allowed',
-  },
-};

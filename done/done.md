@@ -1,68 +1,85 @@
 # Done - Tính Năng Đã Hoàn Thành
 
-## Backend
-- [x] Project structure setup
-- [x] Database setup (SQLite via sql.js)
-- [x] Auth API (register, login, logout)
-- [x] User API (search, profile, status)
-- [x] Contact API (add, accept, remove, pending requests)
-- [x] Message API (send, get, read)
-- [x] Socket.io setup (real-time messaging)
-- [x] Video call signaling (WebRTC relay via socket)
-- [x] Conversation API với unread count & last message
-- [x] Mark messages as read khi xem
-- [x] Group chat API (create, add members, remove, leave)
+## Web App (React)
 
-## Mobile (Flutter)
-- [x] Project setup
-- [x] Auth screens (login, register)
-- [x] Home screen
-- [x] Conversation list
-- [x] Chat screen
-- [x] Video call screen
+### Architecture
+- [x] Project structure với Vite + React
+- [x] Zustand cho state management
+- [x] Socket.io-client cho real-time
+- [x] simple-peer cho WebRTC
 
-## Web (React) - Hybrid UI
-- [x] Project setup (Vite + React)
-- [x] 3-column layout: Sidebar (64px) + ChatList (280px) + ChatPanel
-- [x] Auth screens (Login, Register) với error handling
-- [x] Sidebar component với nav icons + avatar + logout
-- [x] ChatList với search, tabs (All/Unread), conversation items
-- [x] ChatPanel với header, messages, input box
-- [x] Message bubble: sent (right, green) / received (left, white)
-- [x] Online status indicator
-- [x] Unread badge + bold text
-- [x] Real-time message via Socket.io
-- [x] Fix simple-peer global is not defined (vite.config.js)
-- [x] Friend request system (add, accept, decline)
-- [x] Group chat creation modal
-- [x] Notification badge cho friend requests
+### Components
+- [x] 3-column layout: Sidebar (68px) + ChatList (320px) + ChatPanel
+- [x] Login form (minimal design - 280px width)
+- [x] Register form
+- [x] ChatList với search, tabs
+- [x] ChatPanel với messages, input
+- [x] Toast notifications
+- [x] Error boundaries
+- [x] Code splitting với React.lazy
 
-## Dependencies đã cài
+### UI/UX Improvements
+- [x] Tách inline styles sang CSS classes (`components.css`)
+- [x] Skeleton loaders cho loading states
+- [x] Auto-resize textarea
+- [x] Debounced search (400ms)
+- [x] Keyboard shortcuts (Ctrl+N, Escape, etc)
+- [x] Minimal login form design
 
-### Backend
+### Features
+- [x] Authentication (login/register)
+- [x] Friend request system
+- [x] Group chat creation
+- [x] Real-time messaging
+- [x] Video call UI
+
+### Dependencies
 ```
-express, socket.io, sql.js, bcryptjs, jsonwebtoken, cors, helmet, dotenv
+react, react-dom, react-router-dom
+socket.io-client, simple-peer, axios
+zustand, vite
 ```
 
-### Mobile (Flutter)
-```
-flutter_webrtc, socket_io_client, provider, dio, agora_rtc_engine
-```
+## Backend (Node.js)
 
-### Web (React)
-```
-socket.io-client, simple-peer, axios, react-router-dom, zustand
-```
+### Features
+- [x] Express + Socket.io server
+- [x] SQLite via sql.js
+- [x] JWT authentication
+- [x] Rate limiting (100 req/15min)
+- [x] Input validation & sanitization
 
-## Test Scripts
-- [x] test-e2e.js (Playwright for E2E testing)
-- [x] test_bookmarklet.js
-- [x] test_script.js
-- [x] test_api_messaging.js
-- [x] test-realchat.js
+### API Routes
+- [x] /api/auth (login, register, logout, me)
+- [x] /api/users (search, status)
+- [x] /api/contacts (add, accept, pending)
+- [x] /api/conversations (messages, group)
+- [x] /api/calls
+
+### Socket Events
+- [x] send_message, new_message
+- [x] add_friend, friend_request
+- [x] accept_friend, friend_accepted
+- [x] create_group, group_invite
+- [x] call_user, incoming_call
+
+## Code Quality
+
+### Refactoring Done
+- [x] Converted all inline styles to CSS classes
+- [x] Added ErrorBoundary component
+- [x] Added React.lazy for code splitting
+- [x] Removed unused components (ConversationList, MessageBubble, ChatWindow)
+- [x] Added useDebounce hook
+- [x] Added useKeyboardShortcuts hook
+
+### Security Improvements
+- [x] Rate limiting configured
+- [x] Input sanitization added
+- [x] Password validation
 
 ## Test Users (Password: 123)
-- usera@test.com / 123
-- userb@test.com / 123
-- alice@test.com / 123
-- bob@test.com / 123
+- usera@test.com
+- userb@test.com
+- alice@test.com
+- bob@test.com

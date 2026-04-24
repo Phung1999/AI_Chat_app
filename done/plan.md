@@ -44,6 +44,8 @@ Chat app với video call hỗ trợ đa nền tảng (Flutter mobile + React we
 - [x] Fix login error handling (không reload khi sai)
 - [x] UI 3-column hybrid design
 - [x] Friend request & group chat
+- [x] Email-based friend request (thay vì user ID)
+- [x] Separate pages for each sidebar tab
 - [ ] Fix WebRTC integration
 - [ ] Testing end-to-end
 

@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useAuthStore from '../../store/authStore';
-import { COLORS } from '../../services/constants';
 
 export default function RegisterForm() {
   const [displayName, setDisplayName] = useState('');
@@ -11,6 +10,7 @@ export default function RegisterForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [localError, setLocalError] = useState('');
+  const [focusedField, setFocusedField] = useState(null);
   const navigate = useNavigate();
   const { register, error, clearError } = useAuthStore();
 
@@ -18,205 +18,185 @@ export default function RegisterForm() {
     e.preventDefault();
     setLocalError('');
     clearError();
-    
+
     if (password !== confirmPassword) {
-      setLocalError('Passwords do not match');
+      setLocalError('Mật khẩu xác nhận không khớp');
+      return;
+    }
+    if (password.length < 6) {
+      setLocalError('Mật khẩu phải có ít nhất 6 ký tự');
       return;
     }
     if (isSubmitting) return;
-    
+
     setIsSubmitting(true);
     const success = await register(email, password, displayName);
     setIsSubmitting(false);
-    
+
     if (success) {
       navigate('/');
     }
   };
 
+  const displayError = localError || error;
+
+  const getPasswordStrength = () => {
+    if (!password) return null;
+    if (password.length < 6) return { level: 1, label: 'Yếu', color: 'var(--color-error)' };
+    if (password.length < 10) return { level: 2, label: 'Trung bình', color: '#F6AD55' };
+    return { level: 3, label: 'Mạnh', color: 'var(--color-accent-green)' };
+  };
+  const strength = getPasswordStrength();
+
+  const fields = [
+    { id: 'name', icon: 'person', placeholder: 'Tên hiển thị', value: displayName, setter: setDisplayName, type: 'text' },
+    { id: 'email', icon: 'email', placeholder: 'Email', value: email, setter: setEmail, type: 'email' },
+  ];
+
   return (
-    <div style={styles.container}>
-      <div style={styles.card}>
-        <h1 style={styles.title}>Create Account</h1>
+    <div className="register-page-container">
+      <div className="register-blob-1" />
+      <div className="register-blob-2" />
 
-        {localError && (
-          <div style={styles.error}>
-            {localError}
-            <button onClick={() => setLocalError('')} style={styles.errorClose}>×</button>
+      <div className="register-card scale-in">
+        <div className="register-logo-area">
+          <div className="register-logo-circle">
+            <span className="material-symbols-rounded register-logo-icon">
+              person_add
+            </span>
           </div>
-        )}
+          <h1 className="register-app-name gradient-text">Tạo tài khoản</h1>
+          <p className="register-tagline">Tham gia cộng đồng ChatApp ngay hôm nay</p>
+        </div>
 
-        {error && (
-          <div style={styles.error}>
-            {error}
-            <button onClick={clearError} style={styles.errorClose}>×</button>
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} style={styles.form}>
-          <div style={styles.inputGroup}>
-            <span className="material-symbols-rounded" style={styles.inputIcon}>person</span>
-            <input
-              type="text"
-              placeholder="Display Name"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              style={styles.input}
-              required
-            />
-          </div>
-
-          <div style={styles.inputGroup}>
-            <span className="material-symbols-rounded" style={styles.inputIcon}>email</span>
-            <input
-              type="email"
-              placeholder="Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              style={styles.input}
-              required
-            />
-          </div>
-
-          <div style={styles.inputGroup}>
-            <span className="material-symbols-rounded" style={styles.inputIcon}>lock</span>
-            <input
-              type={showPassword ? 'text' : 'password'}
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              style={styles.input}
-              required
-              minLength={6}
-            />
+        {displayError && (
+          <div className="register-error-alert fade-in">
+            <span className="material-symbols-rounded" style={{ fontSize: 18 }}>error</span>
+            <span className="register-error-text">{displayError}</span>
             <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              style={styles.togglePassword}
+              onClick={() => { setLocalError(''); clearError(); }}
+              className="register-error-close"
             >
-              <span className="material-symbols-rounded">
-                {showPassword ? 'visibility_off' : 'visibility'}
-              </span>
+              <span className="material-symbols-rounded" style={{ fontSize: 16 }}>close</span>
             </button>
           </div>
+        )}
 
-          <div style={styles.inputGroup}>
-            <span className="material-symbols-rounded" style={styles.inputIcon}>lock</span>
-            <input
-              type={showPassword ? 'text' : 'password'}
-              placeholder="Confirm Password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              style={styles.input}
-              required
-            />
+        <form onSubmit={handleSubmit} className="register-form">
+          {fields.map((field) => (
+            <div
+              key={field.id}
+              className={`register-input-wrapper ${focusedField === field.id ? 'register-input-wrapper--focused' : ''}`}
+            >
+              <span className="material-symbols-rounded register-input-icon">
+                {field.icon}
+              </span>
+              <input
+                type={field.type}
+                placeholder={field.placeholder}
+                value={field.value}
+                onChange={(e) => field.setter(e.target.value)}
+                onFocus={() => setFocusedField(field.id)}
+                onBlur={() => setFocusedField(null)}
+                className="register-input"
+                required
+              />
+            </div>
+          ))}
+
+          <div>
+            <div className={`register-input-wrapper ${focusedField === 'password' ? 'register-input-wrapper--focused' : ''}`}>
+              <span className="material-symbols-rounded register-input-icon">
+                lock
+              </span>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Mật khẩu (ít nhất 6 ký tự)"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onFocus={() => setFocusedField('password')}
+                onBlur={() => setFocusedField(null)}
+                className="register-input"
+                required
+                minLength={6}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="register-toggle-password"
+              >
+                <span className="material-symbols-rounded" style={{ fontSize: 20 }}>
+                  {showPassword ? 'visibility_off' : 'visibility'}
+                </span>
+              </button>
+            </div>
+            {strength && (
+              <div className="register-strength-row">
+                <div className="register-strength-bars">
+                  {[1, 2, 3].map((n) => (
+                    <div
+                      key={n}
+                      className="register-strength-bar"
+                      style={{
+                        background: n <= strength.level ? strength.color : 'var(--color-border)',
+                      }}
+                    />
+                  ))}
+                </div>
+                <span className="register-strength-label" style={{ color: strength.color }}>
+                  {strength.label}
+                </span>
+              </div>
+            )}
           </div>
 
-          <button type="submit" style={styles.button}>Create Account</button>
+          <div className={`register-input-wrapper ${focusedField === 'confirm' ? 'register-input-wrapper--focused' : ''} ${confirmPassword && confirmPassword !== password ? 'register-input-wrapper--error' : ''}`}>
+            <span className="material-symbols-rounded register-input-icon">
+              lock_reset
+            </span>
+            <input
+              type={showPassword ? 'text' : 'password'}
+              placeholder="Xác nhận mật khẩu"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              onFocus={() => setFocusedField('confirm')}
+              onBlur={() => setFocusedField(null)}
+              className="register-input"
+              required
+            />
+            {confirmPassword && (
+              <span className="material-symbols-rounded register-password-match-icon" style={{
+                color: confirmPassword === password ? 'var(--color-accent-green)' : 'var(--color-error)',
+              }}>
+                {confirmPassword === password ? 'check_circle' : 'cancel'}
+              </span>
+            )}
+          </div>
+
+          <button
+            type="submit"
+            className={`register-submit-btn ${isSubmitting ? 'register-submit-btn--loading' : ''}`}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? (
+              <span className="register-loading-row">
+                <span className="register-spinner" />
+                Đang tạo tài khoản...
+              </span>
+            ) : (
+              <>
+                <span>Tạo tài khoản</span>
+                <span className="material-symbols-rounded" style={{ fontSize: 20 }}>arrow_forward</span>
+              </>
+            )}
+          </button>
         </form>
 
-        <p style={styles.footer}>
-          Already have an account?{' '}
-          <a href="/login" style={styles.link}>Sign In</a>
+        <p className="register-footer">
+          Đã có tài khoản?{' '}
+          <a href="/login" className="register-login-link">Đăng nhập</a>
         </p>
       </div>
     </div>
   );
 }
-
-const styles = {
-  container: {
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    minHeight: '100vh',
-    backgroundColor: '#f5f5f5',
-    padding: 20,
-  },
-  card: {
-    width: '100%',
-    maxWidth: 400,
-    padding: 40,
-    backgroundColor: 'white',
-    borderRadius: 16,
-    boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-    textAlign: 'center',
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: COLORS.primary,
-    margin: '0 0 24px 0',
-  },
-  error: {
-    backgroundColor: '#ffebee',
-    color: COLORS.error,
-    padding: '12px 16px',
-    borderRadius: 8,
-    marginBottom: 16,
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  errorClose: {
-    background: 'none',
-    border: 'none',
-    fontSize: 20,
-    cursor: 'pointer',
-    color: COLORS.error,
-  },
-  form: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 16,
-  },
-  inputGroup: {
-    position: 'relative',
-    display: 'flex',
-    alignItems: 'center',
-  },
-  inputIcon: {
-    position: 'absolute',
-    left: 16,
-    color: '#999',
-    fontSize: 20,
-  },
-  input: {
-    width: '100%',
-    padding: '14px 16px 14px 48px',
-    border: 'none',
-    borderRadius: 8,
-    backgroundColor: '#f5f5f5',
-    fontSize: 16,
-    outline: 'none',
-  },
-  togglePassword: {
-    position: 'absolute',
-    right: 12,
-    background: 'none',
-    border: 'none',
-    cursor: 'pointer',
-    color: '#999',
-  },
-  button: {
-    width: '100%',
-    padding: 14,
-    backgroundColor: COLORS.primary,
-    color: 'white',
-    border: 'none',
-    borderRadius: 8,
-    fontSize: 16,
-    fontWeight: 600,
-    cursor: 'pointer',
-    marginTop: 8,
-  },
-  footer: {
-    marginTop: 24,
-    color: '#666',
-  },
-  link: {
-    color: COLORS.primary,
-    textDecoration: 'none',
-    fontWeight: 600,
-  },
-};

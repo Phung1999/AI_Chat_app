@@ -1,26 +1,31 @@
 import { useEffect, useState, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useWebRTC } from '../hooks/useWebRTC';
 import { socketService } from '../services/socket';
 import useAuthStore from '../store/authStore';
-import { COLORS } from '../services/constants';
 
 export default function VideoCallPage() {
   const { userId } = useParams();
+  const navigate = useNavigate();
   const { user } = useAuthStore();
   const [callStatus, setCallStatus] = useState('calling');
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [remoteStream, setRemoteStream] = useState(null);
+  const [error, setError] = useState(null);
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const localStreamRef = useRef(null);
 
   const onSignal = (data) => {
-    if (callStatus === 'calling') {
-      socketService.sendOffer(parseInt(userId), data);
-    } else {
-      socketService.sendAnswer(parseInt(userId), data);
+    try {
+      if (callStatus === 'calling') {
+        socketService.sendOffer(parseInt(userId), data);
+      } else {
+        socketService.sendAnswer(parseInt(userId), data);
+      }
+    } catch (err) {
+      console.error('Signal error:', err);
     }
   };
 
@@ -31,8 +36,9 @@ export default function VideoCallPage() {
     }
   };
 
-  const onError = (error) => {
-    console.error('WebRTC error:', error);
+  const onError = (err) => {
+    console.error('WebRTC error:', err);
+    setError(err.message || 'Connection failed');
     setCallStatus('error');
   };
 
@@ -43,55 +49,64 @@ export default function VideoCallPage() {
   });
 
   useEffect(() => {
+    let mounted = true;
+
     const startCall = async () => {
       try {
         const stream = await initLocalStream();
+        if (!mounted) return;
+        
         localStreamRef.current = stream;
         if (localVideoRef.current) {
           localVideoRef.current.srcObject = stream;
         }
         socketService.callUser(parseInt(userId));
-      } catch (error) {
-        console.error('Failed to start call:', error);
+      } catch (err) {
+        if (!mounted) return;
+        console.error('Failed to start call:', err);
+        setError('Không thể truy cập camera/microphone');
         setCallStatus('error');
       }
     };
 
     startCall();
 
-    socketService.on('call_accepted', () => {
-      setCallStatus('connected');
-    });
-
-    socketService.on('call_declined', () => {
+    const handleCallAccepted = () => setCallStatus('connected');
+    const handleCallDeclined = () => {
       setCallStatus('declined');
-    });
-
-    socketService.on('call_ended', () => {
+      setError('Người dùng từ chối cuộc gọi');
+    };
+    const handleCallEnded = () => {
       setCallStatus('ended');
-    });
+      setTimeout(() => navigate('/'), 2000);
+    };
+    const handleOffer = (data) => signal(data);
+    const handleAnswer = (data) => signal(data);
+    const handleIceCandidate = (data) => signal({ candidate: data.candidate });
 
-    socketService.on('offer', (data) => {
-      signal(data);
-    });
-
-    socketService.on('answer', (data) => {
-      signal(data);
-    });
-
-    socketService.on('ice_candidate', (data) => {
-      signal({ candidate: data.candidate });
-    });
+    socketService.on('call_accepted', handleCallAccepted);
+    socketService.on('call_declined', handleCallDeclined);
+    socketService.on('call_ended', handleCallEnded);
+    socketService.on('offer', handleOffer);
+    socketService.on('answer', handleAnswer);
+    socketService.on('ice_candidate', handleIceCandidate);
 
     return () => {
+      mounted = false;
       destroy();
+      socketService.off('call_accepted', handleCallAccepted);
+      socketService.off('call_declined', handleCallDeclined);
+      socketService.off('call_ended', handleCallEnded);
+      socketService.off('offer', handleOffer);
+      socketService.off('answer', handleAnswer);
+      socketService.off('ice_candidate', handleIceCandidate);
     };
   }, [userId]);
 
   const endCall = () => {
     socketService.endCall(0);
     destroy();
-    window.close();
+    navigate('/');
   };
 
   const toggleMute = () => {
@@ -104,41 +119,64 @@ export default function VideoCallPage() {
     toggleVideo(!isVideoOff);
   };
 
+  const getCallStatusText = () => {
+    switch (callStatus) {
+      case 'calling': return 'Đang gọi...';
+      case 'connected': return 'Đã kết nối';
+      case 'declined': return 'Từ chối';
+      case 'ended': return 'Cuộc gọi kết thúc';
+      case 'error': return 'Lỗi kết nối';
+      default: return 'Đang kết nối...';
+    }
+  };
+
   return (
-    <div style={styles.container}>
-      <div style={styles.videoContainer}>
-        <div style={styles.remoteVideo}>
+    <div className="videocall-container">
+      <div className="videocall-video-container">
+        <div className="videocall-remote-video">
           {remoteStream ? (
-            <video ref={remoteVideoRef} autoPlay playsInline style={styles.video} />
+            <video ref={remoteVideoRef} autoPlay playsInline className="videocall-video" />
           ) : (
-            <div style={styles.placeholder}>
-              <div style={styles.avatar}>U</div>
-              <p>{callStatus === 'calling' ? 'Calling...' : 'Connecting...'}</p>
+            <div className="videocall-placeholder">
+              <div className="videocall-avatar">
+                {(user?.display_name || user?.email || 'U')[0].toUpperCase()}
+              </div>
+              <p className="videocall-status-text">{getCallStatusText()}</p>
+              {error && <p className="videocall-error-text">{error}</p>}
             </div>
           )}
         </div>
-        <div style={styles.localVideo}>
-          <video ref={localVideoRef} autoPlay playsInline muted style={styles.video} />
+        
+        <div className="videocall-local-video">
+          {!isVideoOff ? (
+            <video ref={localVideoRef} autoPlay playsInline muted className="videocall-video" />
+          ) : (
+            <div className="videocall-video-off">
+              <span className="material-symbols-rounded">videocam_off</span>
+            </div>
+          )}
         </div>
       </div>
 
-      <div style={styles.controls}>
+      <div className="videocall-controls">
         <button
           onClick={toggleMute}
-          style={{ ...styles.btn, backgroundColor: isMuted ? COLORS.error : '#333' }}
+          className={`videocall-btn ${isMuted ? 'videocall-btn--active' : ''}`}
+          title={isMuted ? 'Bật mic' : 'Tắt mic'}
         >
           <span className="material-symbols-rounded">
             {isMuted ? 'mic_off' : 'mic'}
           </span>
         </button>
 
-        <button onClick={endCall} style={{ ...styles.btn, ...styles.endBtn }}>
+        <button onClick={endCall} className="videocall-btn videocall-btn--end" title="Kết thúc">
           <span className="material-symbols-rounded">call_end</span>
         </button>
 
         <button
           onClick={toggleVideoOff}
-          style={{ ...styles.btn, backgroundColor: isVideoOff ? COLORS.error : '#333' }}
+          className={`videocall-btn ${isVideoOff ? 'videocall-btn--active' : ''}`}
+          title={isVideoOff ? 'Bật camera' : 'Tắt camera'}
         >
           <span className="material-symbols-rounded">
             {isVideoOff ? 'videocam_off' : 'videocam'}
@@ -148,77 +186,3 @@ export default function VideoCallPage() {
     </div>
   );
 }
-
-const styles = {
-  container: {
-    display: 'flex',
-    flexDirection: 'column',
-    height: '100vh',
-    backgroundColor: '#000',
-  },
-  videoContainer: {
-    flex: 1,
-    position: 'relative',
-  },
-  remoteVideo: {
-    width: '100%',
-    height: '100%',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  video: {
-    width: '100%',
-    height: '100%',
-    objectFit: 'cover',
-  },
-  placeholder: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    color: '#fff',
-  },
-  avatar: {
-    width: 120,
-    height: 120,
-    borderRadius: '50%',
-    backgroundColor: COLORS.primary,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: 48,
-    marginBottom: 16,
-  },
-  localVideo: {
-    position: 'absolute',
-    bottom: 100,
-    right: 20,
-    width: 160,
-    height: 120,
-    borderRadius: 12,
-    overflow: 'hidden',
-    backgroundColor: '#333',
-  },
-  controls: {
-    display: 'flex',
-    justifyContent: 'center',
-    padding: 24,
-    gap: 24,
-    backgroundColor: 'rgba(0,0,0,0.8)',
-  },
-  btn: {
-    width: 56,
-    height: 56,
-    borderRadius: '50%',
-    border: 'none',
-    backgroundColor: '#333',
-    color: '#fff',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  endBtn: {
-    backgroundColor: COLORS.error,
-  },
-};

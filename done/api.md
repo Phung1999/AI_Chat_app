@@ -70,18 +70,21 @@ Update online status
 ## Contact Endpoints
 
 ### GET /api/contacts
-Get contact list
+Get accepted contact list
+
+### GET /api/contacts/pending
+Get pending friend requests (requests sent TO current user)
 
 ### POST /api/contacts
-Add new contact
+Add new contact (by email)
 ```json
 {
-  "contactId": 2
+  "email": "user@example.com"
 }
 ```
 
 ### PUT /api/contacts/:id
-Accept/Decline contact
+Accept/Decline contact (id = contact record ID)
 ```json
 {
   "status": "accepted"

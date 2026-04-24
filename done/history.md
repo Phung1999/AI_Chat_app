@@ -1,5 +1,31 @@
 # History - Timeline Phát Triển
 
+## 2026-04-24 (Session 5)
+### Friend Request với Email
+- **Frontend**: Gửi email thay vì user ID khi thêm bạn
+  - API `contactsAPI.add(email)` thay vì `contactsAPI.add(contactId)`
+  - Socket `addFriend(email)` lookup email phía server
+  
+- **Backend**: Lookup email trong service
+  - Thêm method `addContactByEmail(userId, email)` trong contactService
+  - Socket handler nhận `targetEmail`, lookup user và gửi notification
+  
+- **Database**: Query pending requests
+  - Sửa mapping data: `req.id`, `req.contact_id` thay vì `req.user_id`
+  - Load notification count khi khởi động
+
+### Accept Friend
+- **Backend**: Sửa `updateContactStatus` logic
+  - Tìm đúng contact record theo ID
+  - Tạo reverse relationship (A accepts B → tạo B→A record)
+  
+- **Frontend**: Thêm log debug, error handling
+
+### Pages
+- Tạo ContactsPage, CallsPage, SettingsPage
+- Mỗi tab sidebar có màn hình riêng
+- NotificationsPanel load từ API
+
 ## 2026-04-23 (Session 4)
 ### Friend Request & Group Chat
 - Thêm tính năng kết bạn với chấp nhận/từ chối

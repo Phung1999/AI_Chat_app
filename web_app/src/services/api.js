@@ -50,7 +50,7 @@ export const usersAPI = {
 export const contactsAPI = {
   getAll: () => api.get('/contacts'),
   getPending: () => api.get('/contacts/pending'),
-  add: (contactId) => api.post('/contacts', { contactId }),
+  add: (email) => api.post('/contacts', { email }),
   update: (id, status) => api.put(`/contacts/${id}`, { status }),
   remove: (id) => api.delete(`/contacts/${id}`),
 };

@@ -28,11 +28,21 @@ async function getPendingContacts(req, res) {
 
 async function addContact(req, res) {
   try {
-    const { contactId } = req.body;
-    const contact = contactService.addContact(req.userId, contactId);
+    const { email } = req.body;
+    console.log('[ADD_CONTACT] Attempting: userId=', req.userId, 'email=', email);
+    
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'BAD_REQUEST', message: 'Email is required' }
+      });
+    }
+    
+    const contact = contactService.addContactByEmail(req.userId, email);
     res.status(201).json({ success: true, data: contact });
   } catch (error) {
-    if (error.message.includes('Cannot add yourself') || error.message.includes('already exists')) {
+    console.error('[ADD_CONTACT] Error:', error.message);
+    if (error.message.includes('Cannot add yourself') || error.message.includes('already exists') || error.message.includes('already sent') || error.message.includes('not found')) {
       return res.status(400).json({
         success: false,
         error: { code: 'BAD_REQUEST', message: error.message }
@@ -49,7 +59,9 @@ async function addContact(req, res) {
 async function updateContact(req, res) {
   try {
     const { status } = req.body;
-    const result = contactService.updateContactStatus(req.params.id, req.userId, status);
+    console.log('[UPDATE_CONTACT] id:', req.params.id, 'userId:', req.userId, 'status:', status);
+    const result = contactService.updateContactStatus(parseInt(req.params.id), req.userId, status);
+    console.log('[UPDATE_CONTACT] result:', result);
     if (result.changes === 0) {
       return res.status(404).json({
         success: false,

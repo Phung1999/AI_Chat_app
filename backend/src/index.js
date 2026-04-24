@@ -3,6 +3,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 
 const config = require('./config/constants');
 const { initDatabase } = require('./config/database');
@@ -25,12 +26,41 @@ const io = new Server(server, {
   }
 });
 
-app.use(helmet({ contentSecurityPolicy: false }));
-app.use(cors({ origin: config.corsOrigin, credentials: true }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+const corsOptions = {
+  origin: config.corsOrigin,
+  credentials: true,
+};
 
-app.use('/api/auth', authRoutes);
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  message: {
+    success: false,
+    error: { code: 'RATE_LIMIT', message: 'Too many requests, please try again later' }
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: {
+    success: false,
+    error: { code: 'RATE_LIMIT', message: 'Too many authentication attempts' }
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => req.path === '/login' || req.path === '/register' ? false : true,
+});
+
+app.use(helmet({ contentSecurityPolicy: false }));
+app.use(cors(corsOptions));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+app.use('/api', generalLimiter);
+app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/contacts', contactRoutes);
 app.use('/api/conversations', chatRoutes);
@@ -61,10 +91,11 @@ async function startServer() {
 
   server.listen(config.port, () => {
     console.log(`
-🚀 Server running on port ${config.port}
-📡 HTTP: http://localhost:${config.port}
-🔌 Socket.io: ready
-📂 CORS Origin: ${config.corsOrigin}
+ 🚀 Server running on port ${config.port}
+ 📡 HTTP: http://localhost:${config.port}
+ 🔌 Socket.io: ready
+ 📂 CORS Origin: ${config.corsOrigin}
+ 📝 Rate Limit: 100 requests/15min
     `);
   });
 }

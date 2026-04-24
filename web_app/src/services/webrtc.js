@@ -11,11 +11,26 @@ class WebRTCService {
     this.onError = null;
   }
 
+  get iceServers() {
+    return [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' },
+    ];
+  }
+
   async initLocalStream() {
     try {
       this.localStream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 640, height: 480, facingMode: 'user' },
-        audio: true,
+        video: { 
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: 'user',
+        },
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
       });
       return this.localStream;
     } catch (error) {
@@ -30,38 +45,58 @@ class WebRTCService {
       initiator: isInitiator,
       trickle: true,
       stream: stream || this.localStream,
+      config: {
+        iceServers: this.iceServers,
+      },
     });
 
     this.peer.on('signal', (data) => {
-      this.onSignal?.(data);
+      if (this.onSignal) {
+        this.onSignal(data);
+      }
     });
 
     this.peer.on('stream', (stream) => {
       this.remoteStream = stream;
-      this.onStream?.(stream);
+      if (this.onStream) {
+        this.onStream(stream);
+      }
     });
 
     this.peer.on('ice', (candidate) => {
-      this.onCandidate?.(candidate);
+      if (this.onCandidate) {
+        this.onCandidate(candidate);
+      }
     });
 
     this.peer.on('error', (err) => {
       console.error('Peer error:', err);
-      this.onError?.(err);
+      if (this.onError) {
+        this.onError(err);
+      }
     });
 
     return this.peer;
   }
 
   signal(data) {
-    if (this.peer) {
-      this.peer.signal(data);
+    if (this.peer && data) {
+      try {
+        this.peer.signal(data);
+      } catch (error) {
+        console.error('Signal error:', error);
+      }
     }
   }
 
   addIceCandidate(candidate) {
-    if (this.peer) {
-      this.peer.peer蛋蛋.addIceCandidate(candidate);
+    if (this.peer && this.peer._pc && candidate) {
+      try {
+        const iceCandidate = new RTCIceCandidate(candidate);
+        this.peer._pc.addIceCandidate(iceCandidate);
+      } catch (error) {
+        console.error('Add ICE candidate error:', error);
+      }
     }
   }
 
@@ -84,12 +119,16 @@ class WebRTCService {
   destroy() {
     if (this.localStream) {
       this.localStream.getTracks().forEach((track) => track.stop());
+      this.localStream = null;
     }
     if (this.peer) {
-      this.peer.destroy();
+      try {
+        this.peer.destroy();
+      } catch (error) {
+        console.error('Destroy peer error:', error);
+      }
+      this.peer = null;
     }
-    this.peer = null;
-    this.localStream = null;
     this.remoteStream = null;
   }
 }

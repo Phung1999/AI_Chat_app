@@ -88,20 +88,35 @@ function setupSocket(io) {
 
     socket.on('add_friend', async (data) => {
       try {
-        const { targetUserId } = data;
+        const { targetUserId, targetEmail } = data;
         const sender = authService.getProfile(socket.userId);
         
-        contactService.addContact(socket.userId, targetUserId);
+        let targetId = targetUserId;
         
-        const targetSocket = onlineUsers.get(targetUserId);
-        if (targetSocket) {
-          io.to(targetSocket).emit('friend_request', {
-            from: sender,
-            contactId: getLastInsertRowId()
-          });
+        if (targetEmail) {
+          const targetUser = userService.getUserByEmail(targetEmail);
+          if (targetUser) {
+            targetId = targetUser.id;
+          }
         }
         
-        socket.emit('friend_request_sent', { targetUserId });
+        console.log(`[SOCKET] add_friend: sender=${socket.userId}, targetId=${targetId}, targetEmail=${targetEmail}`);
+        
+        if (targetId) {
+          const targetSocket = onlineUsers.get(targetId);
+          
+          if (targetSocket) {
+            io.to(targetSocket).emit('friend_request', {
+              from: sender,
+              contactId: null
+            });
+            console.log(`[SOCKET] Emitted friend_request to user ${targetId}`);
+          } else {
+            console.log(`[SOCKET] User ${targetId} not online`);
+          }
+          
+          socket.emit('friend_request_sent', { targetUserId: targetId });
+        }
       } catch (error) {
         console.error('Add friend error:', error);
         socket.emit('error', { message: error.message });
@@ -111,18 +126,22 @@ function setupSocket(io) {
     socket.on('accept_friend', async (data) => {
       try {
         const { contactId, fromUserId } = data;
-        contactService.updateContactStatus(contactId, socket.userId, 'accepted');
+        const result = contactService.updateContactStatus(contactId, socket.userId, 'accepted');
         
-        const senderSocket = onlineUsers.get(fromUserId);
-        if (senderSocket) {
-          const accepter = authService.getProfile(socket.userId);
-          io.to(senderSocket).emit('friend_accepted', {
-            accepter,
-            contactId
-          });
+        if (result.changes > 0) {
+          const senderSocket = onlineUsers.get(fromUserId);
+          if (senderSocket) {
+            const accepter = authService.getProfile(socket.userId);
+            io.to(senderSocket).emit('friend_accepted', {
+              accepter,
+              contactId
+            });
+          }
+          
+          socket.emit('friend_accept_success', { contactId });
+        } else {
+          socket.emit('friend_accept_error', { message: 'Contact not found' });
         }
-        
-        socket.emit('friend_accept_success', { contactId });
       } catch (error) {
         console.error('Accept friend error:', error);
         socket.emit('error', { message: error.message });

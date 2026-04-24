@@ -33,6 +33,14 @@
 | CORS blocked | Wrong origin | Update CORS whitelist |
 | WebRTC not supported | Old browser | Show warning |
 
+### Friend Request Errors
+| Lỗi | Nguyên nhân | Cách xử lý |
+|------|-------------|------------|
+| 400 "Contact already exists" | Đã là bạn hoặc đã gửi request | Kiểm tra DB, xóa contacts cũ |
+| 400 "Cannot add yourself" | Target = current user | Validate trước khi gửi |
+| Socket notification not received | User B chưa online | Đảm bảo cả 2 đã đăng nhập |
+| contactsAPI is not defined | Import thiếu trong chatStore | Thêm vào import |
+
 ---
 
 ## Troubleshooting Guide

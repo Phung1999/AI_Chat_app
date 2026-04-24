@@ -59,8 +59,9 @@ export const socketService = {
     socket?.emit('stop_typing', { conversationId });
   },
 
-  addFriend: (targetUserId) => {
-    socket?.emit('add_friend', { targetUserId });
+  addFriend: (targetUserIdOrEmail) => {
+    console.log('[SOCKET] addFriend called:', targetUserIdOrEmail, 'socket connected:', socket?.connected);
+    socket?.emit('add_friend', { targetEmail: targetUserIdOrEmail });
   },
 
   acceptFriend: (contactId, fromUserId) => {
